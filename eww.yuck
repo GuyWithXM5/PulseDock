@@ -1,0 +1,211 @@
+; ─────────────────────────────────────────────
+;  Music Player Widget  –  eww.yuck
+;  Run:  eww open music-player
+; ─────────────────────────────────────────────
+
+; ── Variables ──────────────────────────────────
+(defvar song-title   "Midnight City Lights")
+(defvar song-artist  "Electronic Dreams")
+(defvar song-year    "2024")
+(defvar song-cover   "~/.config/eww/assets/cover.jpg")
+
+(defvar current-time "1:42")
+(defvar total-time   "3:54")
+(defvar progress     45)   ; percentage 0-100
+
+(defvar volume       66)   ; percentage 0-100
+(defvar playing      false)
+(defvar liked        false)
+(defvar repeat-on   false)
+
+; ── Custom Widgets ─────────────────────────────
+
+; Icon button (circular)
+(defwidget icon-btn [icon action tooltip-text]
+  (eventbox
+    :onclick action
+    :cursor  "pointer"
+    :tooltip tooltip-text
+    (box
+      :class "icon-btn"
+      :halign "center"
+      :valign "center"
+      (label :text icon :class "icon-btn-icon"))))
+
+; Play / Pause button (large primary)
+(defwidget play-btn []
+  (eventbox
+    :onclick "scripts/toggle-play.sh"
+    :cursor  "pointer"
+    (box
+      :class  "play-btn"
+      :halign "center"
+      :valign "center"
+      (label
+        :text  {playing ? "pause" : "play_arrow"}
+        :class "play-btn-icon"))))
+
+; Progress bar
+(defwidget progress-bar []
+  (box :orientation "v" :spacing 6 :class "progress-section"
+    (centerbox :orientation "h" :class "progress-times"
+      (label :text current-time :class "time-label" :halign "start")
+      (box)
+      (label :text total-time   :class "time-label" :halign "end"))
+    (eventbox
+      :onclick  "scripts/seek.sh {}"
+      :cursor   "pointer"
+      :class    "progress-track-wrap"
+      (box :orientation "h" :class "progress-track"
+        (scale
+          :class       "progress-scale"
+          :value       progress
+          :min         0
+          :max         100
+          :orientation "h"
+          :hexpand     true
+          :onchange    "scripts/seek.sh {}")))))
+
+; Volume control
+(defwidget volume-control []
+  (box
+    :class       "volume-control"
+    :orientation "h"
+    :spacing     10
+    :halign      "end"
+    (label :text "volume_up" :class "volume-icon")
+    (scale
+      :class       "volume-scale"
+      :value       volume
+      :min         0
+      :max         100
+      :orientation "h"
+      :width       80
+      :onchange    "scripts/set-volume.sh {}")))
+
+; Secondary action buttons (like, repeat, volume)
+(defwidget secondary-controls []
+  (box
+    :class       "secondary-controls"
+    :orientation "h"
+    :spacing     20
+    :halign      "end"
+    :valign      "center"
+    (eventbox
+      :onclick "scripts/toggle-like.sh"
+      :cursor  "pointer"
+      (label
+        :text  {liked ? "favorite" : "favorite_border"}
+        :class {liked ? "action-icon active" : "action-icon"}))
+    (eventbox
+      :onclick "scripts/toggle-repeat.sh"
+      :cursor  "pointer"
+      (label
+        :text  "repeat"
+        :class {repeat-on ? "action-icon active" : "action-icon"}))
+    (volume-control)))
+
+; Transport controls (prev / play / next)
+(defwidget transport-controls []
+  (box
+    :class       "transport-controls"
+    :orientation "h"
+    :spacing     20
+    :valign      "center"
+    (eventbox
+      :onclick "scripts/prev.sh"
+      :cursor  "pointer"
+      (label :text "skip_previous" :class "skip-icon"))
+    (play-btn)
+    (eventbox
+      :onclick "scripts/next.sh"
+      :cursor  "pointer"
+      (label :text "skip_next" :class "skip-icon"))))
+
+; Header row (title + action buttons)
+(defwidget player-header []
+  (centerbox
+    :orientation "h"
+    :class       "player-header"
+    (box
+      :orientation "v"
+      :spacing     4
+      :class       "track-info"
+      :halign      "start"
+      (label :text song-title  :class "song-title"  :halign "start")
+      (label :text "${song-artist} • ${song-year}" :class "song-meta" :halign "start"))
+    (box)
+    (box
+      :orientation "h"
+      :spacing     10
+      :halign      "end"
+      (icon-btn
+        :icon         "shuffle"
+        :action       "scripts/toggle-shuffle.sh"
+        :tooltip-text "Shuffle")
+      (eventbox
+        :onclick "scripts/change-output.sh"
+        :cursor  "pointer"
+        (box
+          :class       "btn-output"
+          :orientation "h"
+          :spacing     8
+          (label :text "speaker_group" :class "output-icon")
+          (label :text "Change Output" :class "output-label"))))))
+
+; Album art
+(defwidget album-art []
+  (box
+    :class  "album-art-wrap"
+    :halign "center"
+    :valign "center"
+    (image
+      :path         song-cover
+      :image-width  200
+      :image-height 200
+      :class        "album-art")))
+
+; Full controls section (transport + secondary)
+(defwidget controls-row []
+  (centerbox
+    :orientation "h"
+    :class       "controls-row"
+    (transport-controls)
+    (box)
+    (secondary-controls)))
+
+; Main player content (right side)
+(defwidget player-content []
+  (box
+    :orientation "v"
+    :spacing     0
+    :class       "player-content"
+    :hexpand     true
+    (player-header)
+    (progress-bar)
+    (controls-row)))
+
+; Root player widget
+(defwidget music-player []
+  (box
+    :class       "player-card"
+    :orientation "h"
+    :spacing     40
+    :halign      "center"
+    :valign      "center"
+    (album-art)
+    (player-content)))
+
+; ── Window ─────────────────────────────────────
+(defwindow music-player
+  :monitor 0
+  :geometry (geometry
+    :x      "50%"
+    :y      "50%"
+    :width  "860px"
+    :height "240px"
+    :anchor "center")
+  :stacking   "fg"
+  :wm-ignore  true
+  :focusable  true
+  (music-player))
