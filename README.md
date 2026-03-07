@@ -1,4 +1,4 @@
-# audplay
+# PulseDock
 
 A floating eww music player widget that reads live metadata from YouTube Music (or any browser-based player) via MPRIS/playerctl.
 
