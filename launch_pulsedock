@@ -1,19 +1,19 @@
 #!/bin/bash
-## audplay – eww music player launcher / toggler
+## PulseDock – eww music player launcher / toggler
 
 # Config dir is the directory containing this script
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-EWW="eww -c $DIR"
+EWW="/usr/local/bin/eww -c $DIR"
 WINDOW="music-player"
 
-# Start daemon if not running
-if ! pgrep -x eww >/dev/null; then
-    ${EWW} daemon
+# Start daemon with this config if not already running for it
+if ! ${EWW} ping &>/dev/null; then
+    ${EWW} daemon &
     sleep 1
 fi
 
 # Toggle: close if already open, open if not
-if ${EWW} list-windows | grep -q "\*${WINDOW}"; then
+if ${EWW} list-windows 2>/dev/null | grep -q "\*${WINDOW}"; then
     ${EWW} close "${WINDOW}"
 else
     ${EWW} open "${WINDOW}"
