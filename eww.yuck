@@ -4,24 +4,61 @@
 ; ─────────────────────────────────────────────
 
 ; ── Variables ──────────────────────────────────
-(defvar song-title   "Midnight City Lights")
-(defvar song-artist  "Electronic Dreams")
-(defvar song-year    "2024")
-(defvar song-cover   "~/.config/eww/assets/cover.jpg")
 
-(defvar current-time "1:42")
-(defvar total-time   "3:54")
-(defvar progress     45)   ; percentage 0-100
+; Playing state — reacts instantly via playerctl --follow
+(deflisten playing :initial "false"
+  `scripts/listen-status.sh`)
 
-(defvar volume       66)   ; percentage 0-100
-(defvar playing      false)
-(defvar liked        false)
-(defvar repeat-on   false)
+; Track metadata — polled every 2 s
+(defpoll song-title :interval "2s" :initial "Not Playing"
+  `playerctl --player=chromium,chrome,firefox,brave,%any metadata title 2>/dev/null || echo "Not Playing"`)
+
+(defpoll song-artist :interval "2s" :initial ""
+  `playerctl --player=chromium,chrome,firefox,brave,%any metadata artist 2>/dev/null || echo ""`)
+
+; Holds album / playlist name (YT Music exposes this as the album field)
+(defpoll song-year :interval "2s" :initial ""
+  `playerctl --player=chromium,chrome,firefox,brave,%any metadata album 2>/dev/null || echo ""`)
+
+; Cover art — downloads artUrl to /tmp, returns local file path
+(defpoll song-cover :interval "3s" :initial ""
+  `scripts/get-cover.sh`)
+
+; Playback position formatted as m:ss, polled every second
+(defpoll current-time :interval "1s" :initial "0:00"
+  `playerctl --player=chromium,chrome,firefox,brave,%any position 2>/dev/null \
+   | awk '{m=int($1/60); s=int($1%60); printf "%d:%02d\n", m, s}' || echo "0:00"`)
+
+; Track duration formatted as m:ss, polled every 5 s (doesn't change mid-track)
+(defpoll total-time :interval "5s" :initial "0:00"
+  `playerctl --player=chromium,chrome,firefox,brave,%any metadata mpris:length 2>/dev/null \
+   | awk '{m=int($1/1000000/60); s=int($1/1000000%60); printf "%d:%02d\n", m, s}' || echo "0:00"`)
+
+; Progress percentage 0-100
+(defpoll progress :interval "1s" :initial 0
+  `scripts/get-progress.sh`)
+
+; System volume from the default PulseAudio / PipeWire sink
+(defpoll volume :interval "2s" :initial 66
+  `pactl get-sink-volume @DEFAULT_SINK@ | grep -oP '\d+(?=%)' | head -1 || echo "50"`)
+
+; Repeat state — true when playerctl loop is Track or Playlist
+(defpoll repeat-on :interval "2s" :initial "false"
+  `playerctl --player=chromium,chrome,firefox,brave,%any loop 2>/dev/null \
+   | grep -q "Track\|Playlist" && echo "true" || echo "false"`)
+
+; Shuffle state
+(defpoll shuffle-on :interval "2s" :initial "false"
+  `playerctl --player=chromium,chrome,firefox,brave,%any shuffle 2>/dev/null \
+   | grep -qi "^On$" && echo "true" || echo "false"`)
+
+; Like is UI-only (no MPRIS API); toggled by scripts/toggle-like.sh via `eww update`
+(defvar liked false)
 
 ; ── Custom Widgets ─────────────────────────────
 
-; Icon button (circular)
-(defwidget icon-btn [icon action tooltip-text]
+; Icon button (circular) — optional :active prop highlights the icon
+(defwidget icon-btn [icon action tooltip-text ?active]
   (eventbox
     :onclick action
     :cursor  "pointer"
@@ -30,7 +67,7 @@
       :class "icon-btn"
       :halign "center"
       :valign "center"
-      (label :text icon :class "icon-btn-icon"))))
+      (label :text icon :class {active ? "icon-btn-icon active" : "icon-btn-icon"}))))
 
 ; Play / Pause button (large primary)
 (defwidget play-btn []
@@ -142,7 +179,8 @@
       (icon-btn
         :icon         "shuffle"
         :action       "scripts/toggle-shuffle.sh"
-        :tooltip-text "Shuffle")
+        :tooltip-text "Shuffle"
+        :active       shuffle-on)
       (eventbox
         :onclick "scripts/change-output.sh"
         :cursor  "pointer"
